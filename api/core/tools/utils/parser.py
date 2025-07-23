@@ -145,6 +145,7 @@ class ApiBasedToolSchemaParser:
                     warning["duplicated_parameter"] = f"Parameter {name} is duplicated."
 
             # check if there is a operation id, use $path_$method as operation id if not
+            # Ensure operationId exists (generate if missing)
             if "operationId" not in interface["operation"]:
                 path = interface["path"]
                 if path.startswith("/"):
@@ -157,6 +158,13 @@ class ApiBasedToolSchemaParser:
                 if not method:
                     method = "get"
                 interface["operation"]["operationId"] = f"{path}_{method}"
+
+            # ---- Always sanitize operationId here ----
+            opid = interface["operation"]["operationId"]
+            opid = re.sub(r"[^a-zA-Z0-9_-]", "", opid)
+            if not opid:
+                opid = "root"
+            interface["operation"]["operationId"] = opid
 
             bundles.append(
                 ApiToolBundle(
