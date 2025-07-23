@@ -146,6 +146,7 @@ class ApiBasedToolSchemaParser:
 
             # check if there is a operation id, use $path_$method as operation id if not
             # Ensure operationId exists (generate if missing)
+            print("DEBUG TOOL NAME:", interface["operation"]["operationId"])
             if "operationId" not in interface["operation"]:
                 path = interface["path"]
                 if path.startswith("/"):
