@@ -146,16 +146,17 @@ class ApiBasedToolSchemaParser:
 
             # check if there is a operation id, use $path_$method as operation id if not
             if "operationId" not in interface["operation"]:
-                # remove special characters like / to ensure the operation id is valid ^[a-zA-Z0-9_-]{1,64}$
                 path = interface["path"]
-                if interface["path"].startswith("/"):
-                    path = interface["path"][1:]
-                # remove special characters like / to ensure the operation id is valid ^[a-zA-Z0-9_-]{1,64}$
+                if path.startswith("/"):
+                    path = path[1:]
+                # Remove ALL invalid characters from both path and method
                 path = re.sub(r"[^a-zA-Z0-9_-]", "", path)
+                method = re.sub(r"[^a-zA-Z0-9_-]", "", interface['method'])
                 if not path:
-                    path = "<root>"
-
-                interface["operation"]["operationId"] = f"{path}_{interface['method']}"
+                    path = "root"
+                if not method:
+                    method = "get"
+                interface["operation"]["operationId"] = f"{path}_{method}"
 
             bundles.append(
                 ApiToolBundle(
