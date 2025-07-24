@@ -17,9 +17,10 @@ class MCPTool(Tool):
     runtime_parameters: Optional[list[ToolParameter]]
     server_url: str
     provider_id: str
+    original_tool_name: str
 
     def __init__(
-        self, entity: ToolEntity, runtime: ToolRuntime, tenant_id: str, icon: str, server_url: str, provider_id: str
+        self, entity: ToolEntity, runtime: ToolRuntime, tenant_id: str, icon: str, server_url: str, provider_id: str, original_tool_name: Optional[str] = None
     ) -> None:
         super().__init__(entity, runtime)
         self.tenant_id = tenant_id
@@ -27,6 +28,8 @@ class MCPTool(Tool):
         self.runtime_parameters = None
         self.server_url = server_url
         self.provider_id = provider_id
+        # Use the original tool name if provided, else fall back to sanitized name
+        self.original_tool_name = original_tool_name or entity.identity.name
 
     def tool_provider_type(self) -> ToolProviderType:
         return ToolProviderType.MCP
@@ -44,7 +47,8 @@ class MCPTool(Tool):
         try:
             with MCPClient(self.server_url, self.provider_id, self.tenant_id, authed=True) as mcp_client:
                 tool_parameters = self._handle_none_parameter(tool_parameters)
-                result = mcp_client.invoke_tool(tool_name=self.entity.identity.name, tool_args=tool_parameters)
+                # Use original tool name for MCP server
+                result = mcp_client.invoke_tool(tool_name=self.original_tool_name, tool_args=tool_parameters)
         except MCPAuthError as e:
             raise ToolInvokeError("Please auth the tool first") from e
         except MCPConnectionError as e:
@@ -79,6 +83,7 @@ class MCPTool(Tool):
             icon=self.icon,
             server_url=self.server_url,
             provider_id=self.provider_id,
+            original_tool_name=self.original_tool_name,  # propagate original name
         )
 
     def _handle_none_parameter(self, parameter: dict[str, Any]) -> dict[str, Any]:
