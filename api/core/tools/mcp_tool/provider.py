@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from core.mcp.types import Tool as RemoteMCPTool
@@ -38,6 +39,21 @@ class MCPToolProviderController(ToolProviderController):
         """
         return ToolProviderType.MCP
 
+    @staticmethod
+    def _sanitize_tool_name(name: str) -> str:
+        """
+        Sanitize tool name to match the pattern ^[a-zA-Z0-9_-]+$
+        Required by OpenAI and other providers
+        """
+        # Replace spaces with underscores
+        sanitized = name.replace(' ', '_')
+        # Remove any characters that don't match the pattern
+        sanitized = re.sub(r'[^a-zA-Z0-9_-]', '', sanitized)
+        # Ensure it's not empty
+        if not sanitized:
+            sanitized = 'tool'
+        return sanitized
+
     @classmethod
     def _from_db(cls, db_provider: MCPToolProvider) -> "MCPToolProviderController":
         """
@@ -51,7 +67,7 @@ class MCPToolProviderController(ToolProviderController):
             ToolEntity(
                 identity=ToolIdentity(
                     author=user.name if user else "Anonymous",
-                    name=remote_mcp_tool.name,
+                    name=cls._sanitize_tool_name(remote_mcp_tool.name),  # <-- Sanitize the name here
                     label=I18nObject(en_US=remote_mcp_tool.name, zh_Hans=remote_mcp_tool.name),
                     provider=db_provider.server_identifier,
                     icon=db_provider.icon,
