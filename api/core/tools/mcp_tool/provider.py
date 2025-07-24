@@ -29,6 +29,7 @@ class MCPToolProviderController(ToolProviderController):
         self.tenant_id = tenant_id
         self.provider_id = provider_id
         self.server_url = server_url
+        self.tool_name_mapping = {}  # add default
 
     @property
     def provider_type(self) -> ToolProviderType:
@@ -45,11 +46,8 @@ class MCPToolProviderController(ToolProviderController):
         Sanitize tool name to match the pattern ^[a-zA-Z0-9_-]+$
         Required by OpenAI and other providers
         """
-        # Replace spaces with underscores
         sanitized = name.replace(' ', '_')
-        # Remove any characters that don't match the pattern
         sanitized = re.sub(r'[^a-zA-Z0-9_-]', '', sanitized)
-        # Ensure it's not empty
         if not sanitized:
             sanitized = 'tool'
         return sanitized
@@ -59,7 +57,6 @@ class MCPToolProviderController(ToolProviderController):
         """
         from db provider
         """
-        tools = []
         tools_data = json.loads(db_provider.tools)
         remote_mcp_tools = [RemoteMCPTool(**tool) for tool in tools_data]
         user = db_provider.load_user()
@@ -67,7 +64,7 @@ class MCPToolProviderController(ToolProviderController):
             ToolEntity(
                 identity=ToolIdentity(
                     author=user.name if user else "Anonymous",
-                    name=cls._sanitize_tool_name(remote_mcp_tool.name),  # <-- Sanitize the name here
+                    name=cls._sanitize_tool_name(remote_mcp_tool.name),  # Sanitized for OpenAI
                     label=I18nObject(en_US=remote_mcp_tool.name, zh_Hans=remote_mcp_tool.name),
                     provider=db_provider.server_identifier,
                     icon=db_provider.icon,
@@ -84,8 +81,12 @@ class MCPToolProviderController(ToolProviderController):
             )
             for remote_mcp_tool in remote_mcp_tools
         ]
+        tool_name_mapping = {
+            cls._sanitize_tool_name(tool.name): tool.name
+            for tool in remote_mcp_tools
+        }
 
-        return cls(
+        controller = cls(
             entity=ToolProviderEntityWithPlugin(
                 identity=ToolProviderIdentity(
                     author=user.name if user else "Anonymous",
@@ -102,6 +103,8 @@ class MCPToolProviderController(ToolProviderController):
             tenant_id=db_provider.tenant_id or "",
             server_url=db_provider.decrypted_server_url,
         )
+        controller.tool_name_mapping = tool_name_mapping  # Save mapping on the controller
+        return controller
 
     def _validate_credentials(self, user_id: str, credentials: dict[str, Any]) -> None:
         """
@@ -120,6 +123,7 @@ class MCPToolProviderController(ToolProviderController):
         if not tool_entity:
             raise ValueError(f"Tool with name {tool_name} not found")
 
+        original_name = self.tool_name_mapping.get(tool_name, tool_name)
         return MCPTool(
             entity=tool_entity,
             runtime=ToolRuntime(tenant_id=self.tenant_id),
@@ -127,6 +131,7 @@ class MCPToolProviderController(ToolProviderController):
             icon=self.entity.identity.icon,
             server_url=self.server_url,
             provider_id=self.provider_id,
+            original_tool_name=original_name  # <-- pass the original tool name
         )
 
     def get_tools(self) -> list[MCPTool]:  # type: ignore
@@ -141,6 +146,7 @@ class MCPToolProviderController(ToolProviderController):
                 icon=self.entity.identity.icon,
                 server_url=self.server_url,
                 provider_id=self.provider_id,
+                original_tool_name=self.tool_name_mapping.get(tool_entity.identity.name, tool_entity.identity.name)
             )
             for tool_entity in self.entity.tools
         ]
