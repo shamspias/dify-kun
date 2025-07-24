@@ -112,18 +112,17 @@ class MCPToolProviderController(ToolProviderController):
         """
         pass
 
-    def get_tool(self, tool_name: str) -> MCPTool:  # type: ignore
+    def get_tool(self, tool_name: str) -> MCPTool:
         """
         return tool with given name
         """
+        sanitized_name = self._sanitize_tool_name(tool_name)
         tool_entity = next(
-            (tool_entity for tool_entity in self.entity.tools if tool_entity.identity.name == tool_name), None
+            (tool_entity for tool_entity in self.entity.tools if tool_entity.identity.name == sanitized_name), None
         )
-
         if not tool_entity:
             raise ValueError(f"Tool with name {tool_name} not found")
-
-        original_name = self.tool_name_mapping.get(tool_name, tool_name)
+        original_name = getattr(self, 'tool_name_mapping', {}).get(sanitized_name, sanitized_name)
         return MCPTool(
             entity=tool_entity,
             runtime=ToolRuntime(tenant_id=self.tenant_id),
@@ -131,7 +130,7 @@ class MCPToolProviderController(ToolProviderController):
             icon=self.entity.identity.icon,
             server_url=self.server_url,
             provider_id=self.provider_id,
-            original_tool_name=original_name  # <-- pass the original tool name
+            original_tool_name=original_name
         )
 
     def get_tools(self) -> list[MCPTool]:  # type: ignore
